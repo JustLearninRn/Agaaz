@@ -5,21 +5,26 @@ export const config = { path: "/api/*" };
 
 const J = (d, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const clean = (s) => String(s ?? "").replace(/[^\w-]/g, "").slice(0, 60);
-const pw = () => process.env.ADMIN_PASSWORD || "";
-const key = () => crypto.createHash("sha256").update("agaaz2k26|" + pw()).digest();
-const sign = (p) => crypto.createHmac("sha256", key()).update(p).digest("base64url");
-const mkToken = () => { const p = String(Date.now() + 12 * 3600e3); return p + "." + sign(p); };
-function authed(req) {
+const PW = { admin: () => process.env.ADMIN_PASSWORD || "", super: () => process.env.SUPER_ADMIN_PASSWORD || "" };
+const DEF = { presenter: "SRM UNIVERSITY", title: "AAGAAZ 2k26", tagline: "The Fresher's Gala · Crown your Mr. & Miss Fresher" };
+
+const hk = () => crypto.createHash("sha256").update("aagaaz2k26|" + PW.admin() + "|" + PW.super()).digest();
+const sign = (p) => crypto.createHmac("sha256", hk()).update(p).digest("base64url");
+const mkToken = (role) => { const p = `${Date.now() + 12 * 3600e3}_${role}`; return p + "." + sign(p); };
+function roleOf(req) {
   const t = (req.headers.get("authorization") || "").replace(/^Bearer /, "");
   const [p, s] = t.split(".");
-  if (!pw() || !p || !s) return false;
+  if (!p || !s) return null;
   const e = sign(p);
-  if (e.length !== s.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(e), Buffer.from(s)) && Number(p) > Date.now();
+  if (e.length !== s.length || !crypto.timingSafeEqual(Buffer.from(e), Buffer.from(s))) return null;
+  const [exp, role] = p.split("_");
+  if (Number(exp) < Date.now() || !PW[role] || !PW[role]()) return null;
+  return role;
 }
-function samePw(input) {
+function samePw(input, expected) {
+  if (!expected) return false;
   const h = (x) => crypto.createHash("sha256").update(String(x)).digest();
-  return crypto.timingSafeEqual(h(input), h(pw()));
+  return crypto.timingSafeEqual(h(input), h(expected));
 }
 async function all(s, prefix) {
   const { blobs } = await s.list({ prefix });
@@ -40,7 +45,19 @@ async function counts(s) {
   vs.forEach((v) => { c[v.m] = (c[v.m] || 0) + 1; c[v.f] = (c[v.f] || 0) + 1; });
   cache = { t: Date.now(), v: c }; return c;
 }
+function winnersOf(cs, c) {
+  const out = {};
+  for (const g of ["M", "F"]) {
+    const l = cs.filter((x) => x.gender === g).map((x) => ({ ...x, n: c[x.id] || 0 })).sort((a, b) => b.n - a.n);
+    const top = l[0]?.n || 0;
+    out[g] = { winners: top > 0 ? l.filter((x) => x.n === top) : [], ranking: l.slice(0, 5) };
+  }
+  return out;
+}
+const logAct = (s, role, action, detail = "") =>
+  s.set("log:" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), JSON.stringify({ t: Date.now(), role, action, detail })).catch(() => {});
 const body = async (req) => { try { return await req.json(); } catch { return {}; } };
+const site = (st) => ({ presenter: st.presenter || DEF.presenter, title: st.title || DEF.title, tagline: st.tagline || DEF.tagline });
 
 export default async (req) => {
   const s = getStore({ name: "agaaz2k26", consistency: "strong" });
@@ -49,9 +66,16 @@ export default async (req) => {
   try {
     /* ---------- public ---------- */
     if (path === "public" && m === "GET") {
-      const [cs, st] = await Promise.all([all(s, "contestant:"), s.get("settings", { type: "json" })]);
+      const [cs, st0] = await Promise.all([all(s, "contestant:"), s.get("settings", { type: "json" })]);
+      const st = st0 || {};
       const contestants = cs.map(({ _key, ...c }) => c).sort((a, b) => (a.order || 0) - (b.order || 0));
-      return J({ contestants, open: st ? st.open !== false : true, board: st && st.showBoard ? await counts(s) : null });
+      const pub = { contestants, open: st.open !== false, site: site(st), board: null, winners: null };
+      if (st.showBoard || st.winners) {
+        const c = await counts(s);
+        if (st.showBoard) pub.board = c;
+        if (st.winners) pub.winners = winnersOf(contestants, c);
+      }
+      return J(pub);
     }
     if (path.startsWith("img/") && m === "GET") {
       const r = await s.getWithMetadata("img:" + clean(path.slice(4)), { type: "arrayBuffer" });
@@ -66,7 +90,7 @@ export default async (req) => {
       const phone = String(b.phone || "").trim();
       if (!id || !name || !/^\d{10}$/.test(phone)) return J({ error: "Please fill all details correctly (10-digit phone)." }, 400);
       const st = await s.get("settings", { type: "json" });
-      if (st && st.open === false) return J({ error: "Voting is closed." }, 403);
+      if (st && (st.open === false || st.winners)) return J({ error: "Voting is closed." }, 403);
       const [cm, cf] = await Promise.all([s.get("contestant:" + clean(b.m), { type: "json" }), s.get("contestant:" + clean(b.f), { type: "json" })]);
       if (!cm || cm.gender !== "M" || !cf || cf.gender !== "F") return J({ error: "Invalid selection. Please refresh and try again." }, 400);
       const r = await s.set("vote:" + id, JSON.stringify({ reg, name, phone, m: cm.id, f: cf.id, t: Date.now() }), { onlyIfNew: true });
@@ -74,18 +98,31 @@ export default async (req) => {
       return J({ ok: true });
     }
 
-    /* ---------- admin ---------- */
-    if (path === "admin/login" && m === "POST") {
-      if (!pw()) return J({ error: "ADMIN_PASSWORD is not set on the server." }, 500);
+    /* ---------- logins ---------- */
+    if ((path === "admin/login" || path === "super/login") && m === "POST") {
+      const role = path.startsWith("super") ? "super" : "admin";
+      if (!PW[role]()) return J({ error: (role === "super" ? "SUPER_ADMIN_PASSWORD" : "ADMIN_PASSWORD") + " is not set on the server." }, 500);
       const b = await body(req);
-      return samePw(b.password ?? "") ? J({ token: mkToken() }) : J({ error: "Wrong password" }, 401);
+      if (!samePw(b.password ?? "", PW[role]())) return J({ error: "Wrong password" }, 401);
+      await logAct(s, role, "login");
+      return J({ token: mkToken(role), role });
     }
+
+    /* ---------- admin + super ---------- */
     if (path.startsWith("admin/")) {
-      if (!authed(req)) return J({ error: "unauthorized" }, 401);
+      const role = roleOf(req);
+      if (!role) return J({ error: "unauthorized" }, 401);
 
       if (path === "admin/data" && m === "GET") {
-        const [cs, vs, st] = await Promise.all([all(s, "contestant:"), all(s, "vote:"), s.get("settings", { type: "json" })]);
-        return J({ contestants: cs.map(({ _key, ...c }) => c), votes: vs.map(({ _key, ...v }) => ({ ...v, id: _key.slice(5) })), open: st ? st.open !== false : true, showBoard: !!(st && st.showBoard) });
+        const [cs, vs, st0] = await Promise.all([all(s, "contestant:"), all(s, "vote:"), s.get("settings", { type: "json" })]);
+        const st = st0 || {};
+        const data = { role, contestants: cs.map(({ _key, ...c }) => c), votes: vs.map(({ _key, ...v }) => ({ ...v, id: _key.slice(5) })), open: st.open !== false, showBoard: !!st.showBoard, winners: !!st.winners, site: site(st) };
+        if (role === "super") {
+          const { blobs } = await s.list({ prefix: "log:" });
+          const keys = blobs.map((b) => b.key).sort().reverse().slice(0, 150);
+          data.log = (await Promise.all(keys.map((k) => s.get(k, { type: "json" })))).filter(Boolean);
+        }
+        return J(data);
       }
       if (path === "admin/contestant" && m === "POST") {
         const b = await body(req);
@@ -103,20 +140,33 @@ export default async (req) => {
           img = Date.now();
         }
         await s.set("contestant:" + id, JSON.stringify({ id, name, gender: b.gender, talent: String(b.talent || "").trim().slice(0, 200), img, order: old?.order || Date.now() }));
+        await logAct(s, role, old ? "edit contestant" : "add contestant", name);
         return J({ ok: true, id });
       }
       if (path.startsWith("admin/contestant/") && m === "DELETE") {
         const id = clean(path.split("/")[2]);
+        const old = await s.get("contestant:" + id, { type: "json" });
         await Promise.all([s.delete("contestant:" + id), s.delete("img:" + id)]);
+        await logAct(s, role, "delete contestant", old?.name || id);
         return J({ ok: true });
       }
       if (path.startsWith("admin/vote/") && m === "DELETE") {
-        await s.delete("vote:" + clean(path.split("/")[2]));
+        const id = clean(path.split("/")[2]);
+        const old = await s.get("vote:" + id, { type: "json" });
+        await s.delete("vote:" + id);
+        cache.v = null;
+        await logAct(s, role, "remove vote", old ? `${old.reg} · ${old.name} · ${old.phone}` : id);
         return J({ ok: true });
       }
       if (path === "admin/settings" && m === "POST") {
         const b = await body(req);
-        await s.set("settings", JSON.stringify({ open: !!b.open, showBoard: !!b.showBoard }));
+        const n = { ...((await s.get("settings", { type: "json" })) || {}) };
+        const ch = [];
+        for (const k of ["open", "showBoard", "winners"]) if (k in b) { n[k] = !!b[k]; ch.push(`${k}=${n[k]}`); }
+        if (role === "super") for (const k of ["presenter", "title", "tagline"]) if (typeof b[k] === "string") { n[k] = b[k].trim().slice(0, 100); ch.push(k); }
+        await s.set("settings", JSON.stringify(n));
+        cache.v = null;
+        await logAct(s, role, "settings", ch.join(", "));
         return J({ ok: true });
       }
       if (path === "admin/reset" && m === "POST") {
@@ -126,6 +176,8 @@ export default async (req) => {
           const { blobs } = await s.list({ prefix: p });
           for (let i = 0; i < blobs.length; i += 25) await Promise.all(blobs.slice(i, i + 25).map((x) => s.delete(x.key)));
         }
+        cache.v = null;
+        await logAct(s, role, b.all ? "RESET EVERYTHING" : "reset all votes");
         return J({ ok: true });
       }
     }
