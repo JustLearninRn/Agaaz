@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><title>AGAAZ 2k26 · Admin</title>
+<meta charset="utf-8"><title>AAGAAZ 2k26 · Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
-<style>.panel{animation-delay:0s}.hero{padding:10px 0}.hero h1{font-size:clamp(2rem,7vw,3.4rem)}</style>
+<style>.panel,.hero small,.hero h1,.hero p,.rope{animation-delay:0s!important}.panel{animation-delay:0s}.hero{padding:10px 0}.hero h1{font-size:clamp(2rem,7vw,3.4rem)}</style>
 </head><body>
-<canvas id="sp"></canvas><div class="beam a"></div><div class="beam b"></div>
+<canvas id="sp"></canvas><div class="glow"></div>
 <main>
-<div class="hero"><small>BACKSTAGE · ADMIN PORTAL</small><h1>AGAAZ 2k26</h1></div>
+<div class="hero"><small>BACKSTAGE · ADMIN PORTAL</small><h1>AAGAAZ 2k26</h1></div>
 <div id="app"></div>
 </main>
 <script src="/common.js"></script>
@@ -41,7 +41,7 @@ function render(){
 }
 function resBlock(g,title){
   const t=tally()[g],list=D.contestants.filter(c=>c.gender===g).map(c=>({...c,n:t[c.id]||0})).sort((a,b)=>b.n-a.n),top=list[0]?.n||0,tot=list.reduce((s,c)=>s+c.n,0);
-  return `<div class="panel wide"><h2 style="margin-top:0">${title}<span>${tot} votes</span></h2>`+(list.map(c=>`<div class="row"><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b>${top>0&&c.n===top?`<span class="chip">${g==='M'?'LEADING MR':'LEADING MISS'}</span>`:''}<div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="font-size:1.3rem;color:var(--gold2)">${c.n}</div></div>`).join('')||'<p class="mut">No contestants yet.</p>')+'</div>';
+  return `<div class="panel wide"><h2 style="margin-top:0">${title}<span>${tot} votes</span></h2>`+(list.map((c,i)=>`<div class="row"><div class="rk">${['🥇','🥈','🥉'][i]||i+1}</div><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b>${top>0&&c.n===top?`<span class="chip">${g==='M'?'LEADING MR':'LEADING MISS'}</span>`:''}<div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="font-size:1.3rem;color:var(--gold2)">${c.n}</div></div>`).join('')||'<p class="mut">No contestants yet.</p>')+'</div>';
 }
 function tResults(){return `<p class="mut">Live results (auto-refreshing) · ${D.votes.length} total voters</p>`+resBlock('M','MR. FRESHER')+resBlock('F','MISS FRESHER')+`<div class="flex"><button onclick="dlResults()">⬇ Download results</button><button onclick="dlVoters()">⬇ Download voter list</button></div>`}
 function tCont(){
@@ -62,8 +62,8 @@ function tVoters(){
 }
 function tSet(){
   return `<div class="panel wide" style="text-align:center"><h2 style="margin-top:0">Poll Controls</h2>
-  <p class="mut">Voting is currently <b style="color:var(--gold2)">${D.open?'OPEN':'CLOSED'}</b></p>
-  <div class="flex"><button onclick="toggle()">${D.open?'Close voting':'Open voting'}</button>
+  <p class="mut">Voting is <b style="color:var(--gold2)">${D.open?'OPEN':'CLOSED'}</b> · Public leaderboard is <b style="color:var(--gold2)">${D.showBoard?'VISIBLE':'HIDDEN'}</b></p>
+  <div class="flex"><button onclick="toggle()">${D.open?'Close voting':'Open voting'}</button><button onclick="toggleBoard()">${D.showBoard?'Hide':'Show'} public leaderboard</button>
   ${dbtn('rv','Reset all votes (progress)',"reset(false)")}${dbtn('ra','Reset everything',"reset(true)")}</div>
   <p class="mut" style="font-size:.85rem;margin-top:18px">Resetting votes frees every registration number to vote again. Resetting everything also removes all contestants and photos.</p></div>`;
 }
@@ -80,13 +80,14 @@ async function saveC(){
 }
 async function delC(id){try{await api('admin/contestant/'+id,'DELETE');await refresh()}catch(e){toast(e.message)}}
 async function delV(id){try{await api('admin/vote/'+id,'DELETE');await refresh()}catch(e){toast(e.message)}}
-async function toggle(){try{await api('admin/settings','POST',{open:!D.open});await refresh()}catch(e){toast(e.message)}}
+async function toggle(){try{await api('admin/settings','POST',{open:!D.open,showBoard:D.showBoard});await refresh()}catch(e){toast(e.message)}}
+async function toggleBoard(){try{await api('admin/settings','POST',{open:D.open,showBoard:!D.showBoard});await refresh()}catch(e){toast(e.message)}}
 async function reset(all){try{await api('admin/reset','POST',{all});toast('Reset complete');await refresh()}catch(e){toast(e.message)}}
 const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
 function save(name,rows){const b=new Blob(['\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function dlResults(){const t=tally(),r=[['Category','Contestant','Talent','Votes']];
   ['M','F'].forEach(g=>D.contestants.filter(c=>c.gender===g).map(c=>[g==='M'?'Mr Fresher':'Miss Fresher',c.name,c.talent,t[g][c.id]||0]).sort((a,b)=>b[3]-a[3]).forEach(x=>r.push(x)));
-  save('agaaz2k26-results.csv',r)}
-function dlVoters(){save('agaaz2k26-voters.csv',[['Reg No','Name','Phone','Mr Fresher pick','Miss Fresher pick','Time'],...D.votes.map(v=>[v.reg,v.name,v.phone,nm(v.m),nm(v.f),new Date(v.t).toLocaleString()])])}
+  save('aagaaz2k26-results.csv',r)}
+function dlVoters(){save('aagaaz2k26-voters.csv',[['Reg No','Name','Phone','Mr Fresher pick','Miss Fresher pick','Time'],...D.votes.map(v=>[v.reg,v.name,v.phone,nm(v.m),nm(v.f),new Date(v.t).toLocaleString()])])}
 render();if(tok){refresh().then(()=>{timer=setInterval(()=>{if(!X.image)refresh()},10000)})}
 </script></body></html>
