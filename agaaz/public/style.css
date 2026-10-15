@@ -3,12 +3,6 @@
 body{margin:0;background:radial-gradient(ellipse at top,#3a0612 0,var(--bg) 60%) fixed;color:var(--ink);font-family:'Playfair Display',Georgia,serif;min-height:100vh;overflow-x:hidden}
 h1,h2,h3,.cz,button,label{font-family:'Cinzel',Georgia,serif}
 canvas#sp{position:fixed;inset:0;pointer-events:none;z-index:0}
-.cur{position:fixed;top:0;bottom:0;width:51%;background:repeating-linear-gradient(90deg,#5c0615 0 18px,#7d0a1e 18px 36px);z-index:99;box-shadow:0 0 60px #000;pointer-events:none;animation:open 1.8s .5s cubic-bezier(.7,0,.2,1) forwards}
-.cur.l{left:0;--d:-101%}.cur.r{right:0;--d:101%}
-@keyframes open{to{transform:translateX(var(--d))}}
-.beam{position:fixed;top:-20vh;width:30vw;height:140vh;background:linear-gradient(180deg,rgba(246,226,122,.18),transparent 70%);filter:blur(10px);transform-origin:top;z-index:0;pointer-events:none;animation:sway 7s ease-in-out infinite alternate}
-.beam.a{left:5vw;--r:-14deg}.beam.b{right:5vw;--r:14deg;animation-delay:-3s}
-@keyframes sway{from{transform:rotate(calc(var(--r) - 8deg))}to{transform:rotate(calc(var(--r) + 8deg))}}
 main{position:relative;z-index:2;max-width:1000px;margin:0 auto;padding:18px 16px 70px}
 button,.btn{cursor:pointer;border:1px solid var(--gold);background:transparent;color:var(--gold2);padding:9px 16px;letter-spacing:.12em;font-size:.8rem;text-transform:uppercase;transition:.25s;text-decoration:none;display:inline-block}
 button:hover,.btn:hover{background:var(--gold);color:#190a0e;box-shadow:0 0 20px rgba(212,175,55,.5)}
@@ -48,3 +42,22 @@ input:focus,select:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 1
 .flex{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px}
 .mut{color:var(--mut);text-align:center}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;animation-delay:0s!important}}
+
+.intro{position:fixed;inset:0;z-index:99;background:#07030a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;pointer-events:none;animation:iout 1s 2.6s forwards}
+.intro b{font-family:'Cinzel';letter-spacing:.45em;color:var(--gold2);font-size:clamp(1rem,4.2vw,1.7rem);font-weight:500;animation:fd 1.4s .2s both;text-align:center;padding:0 10px}
+.intro i{display:block;width:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:ln 1.4s .7s forwards}
+.intro span{font-style:italic;color:var(--mut);letter-spacing:.35em;animation:fd 1.2s 1.3s both}
+@keyframes ln{to{width:min(320px,65vw)}}@keyframes iout{to{opacity:0;visibility:hidden}}
+.glow{position:fixed;left:50%;top:-12vh;width:95vw;height:75vh;transform:translateX(-50%);background:radial-gradient(ellipse,rgba(212,175,55,.17),transparent 65%);z-index:0;pointer-events:none;animation:breathe 9s ease-in-out infinite alternate}
+@keyframes breathe{from{opacity:.45}to{opacity:1}}
+@keyframes rise2{from{opacity:0;filter:blur(14px);letter-spacing:.3em;transform:scale(.96)}}
+.hero small{animation:fd 1.6s 2.9s both;letter-spacing:.55em}
+.hero h1{animation:shine 7s linear infinite,rise2 2.2s 3.1s both}
+.hero p{animation:fd 1.6s 4s both}
+.rope{animation:fd 2s 4.2s both}
+.card{animation-delay:calc(var(--i,0)*110ms + 4.4s)}
+.panel{animation-delay:4.4s}
+.rk{width:34px;text-align:center;font-family:'Cinzel';color:var(--gold2);font-size:1.15rem;flex:none}
+.lbi{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2f2012}
+.lbi .th{width:40px;height:50px;background:#120609 center/cover;flex:none}.lbi .gr{flex:1;min-width:0}
+.lb{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:10px}
