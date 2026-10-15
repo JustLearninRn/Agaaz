@@ -5,45 +5,97 @@
 <meta name="robots" content="noindex,nofollow">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
-<style>.panel,.hero small,.hero h1,.hero p,.rope{animation-delay:0s!important}.panel{animation-delay:0s}.hero{padding:10px 0}.hero h1{font-size:clamp(2rem,7vw,3.4rem)}</style>
+<style>.panel,.hero small,.hero h1,.hero p,.rope{animation-delay:0s!important}.hero{padding:10px 0}.hero h1{font-size:clamp(2rem,7vw,3.4rem)}.panel{animation:unlock 1s both}.tabin .panel{animation:up .6s both}</style>
 </head><body>
 <canvas id="sp"></canvas><div class="glow"></div>
 <main>
-<div class="hero"><small>BACKSTAGE · ADMIN PORTAL</small><h1>AAGAAZ 2k26</h1></div>
+<div class="hero"><small id="hs">BACKSTAGE · ADMIN PORTAL</small><h1>AAGAAZ 2k26</h1></div><div class="sweep"></div>
 <div id="app"></div>
 </main>
 <script src="/common.js"></script>
 <script>
-let tok=sessionStorage.getItem('agaaz_tok')||'',D={contestants:[],votes:[],open:true},tab='results',X={id:null,name:'',gender:'M',talent:'',image:'',img:0},armed=null,err='',pwv='',timer;
+const SUPER=location.pathname.replace(/\/$/,'')==='/superadmin';
+if(SUPER)$('#hs').textContent='BACKSTAGE · SUPER ADMIN';
+let tok=sessionStorage.getItem('agaaz_tok_'+(SUPER?'s':'a'))||'',D={contestants:[],votes:[],open:true,showBoard:false,winners:false,site:{},log:[]},last='',anim=true;
+let tab=SUPER?'overview':'results',X={id:null,name:'',gender:'M',talent:'',image:'',img:0},armed=null,err='',pwv='',timer,A={q:'',flagged:false},ST=null;
 const nm=id=>D.contestants.find(c=>c.id===id)?.name||'(removed)';
 async function api(p,method='GET',data){
   const r=await fetch('/api/'+p,{method,headers:{'content-type':'application/json',authorization:'Bearer '+tok},body:data?JSON.stringify(data):undefined});
   const j=await r.json().catch(()=>({}));
-  if(r.status===401&&p!=='admin/login'){logout();throw new Error('Session expired')}
+  if(r.status===401&&!p.endsWith('login')){logout();throw new Error('Session expired')}
   if(!r.ok)throw new Error(j.error||'Request failed');return j;
 }
-function logout(){tok='';sessionStorage.removeItem('agaaz_tok');clearInterval(timer);render()}
+function logout(){tok='';sessionStorage.removeItem('agaaz_tok_'+(SUPER?'s':'a'));clearInterval(timer);anim=true;render()}
 async function login(){
-  try{const j=await api('admin/login','POST',{password:pwv});tok=j.token;sessionStorage.setItem('agaaz_tok',tok);err='';pwv='';await refresh();timer=setInterval(()=>{if(!X.image)refresh()},10000)}
+  try{const j=await api((SUPER?'super':'admin')+'/login','POST',{password:pwv});tok=j.token;sessionStorage.setItem('agaaz_tok_'+(SUPER?'s':'a'),tok);err='';pwv='';anim=true;await refresh(true);startTimer()}
   catch(e){err=e.message;render()}
 }
-async function refresh(){try{D=await api('admin/data');render()}catch(e){}}
+function startTimer(){clearInterval(timer);timer=setInterval(()=>refresh(),10000)}
+async function refresh(force){
+  if(!force&&(X.image||['INPUT','SELECT'].includes(document.activeElement?.tagName)))return;
+  try{const n=await api('admin/data'),s=JSON.stringify(n);if(force||s!==last){last=s;D=n;render()}}catch(e){}
+}
 function danger(key,fn){if(armed===key){armed=null;fn()}else{armed=key;render();setTimeout(()=>{if(armed===key){armed=null;render()}},4000)}}
 const dbtn=(key,label,fn)=>`<button class="red" onclick="danger('${key}',()=>${fn})">${armed===key?'Click again to confirm':label}</button>`;
 const tally=()=>{const m={},f={};D.votes.forEach(v=>{m[v.m]=(m[v.m]||0)+1;f[v.f]=(f[v.f]||0)+1});return{M:m,F:f}};
+const medal=i=>['🥇','🥈','🥉'][i]||i+1;
+const tabsList=()=>SUPER?['overview','results','contestants','audit','site','activity','settings']:['results','contestants','voters','settings'];
+function go(t){tab=t;anim=true;render()}
 
 function render(){
   const a=$('#app');
-  if(!tok){a.innerHTML=`<div class="panel"><h2 style="margin-top:0">Admin Login<span>Staff only</span></h2><label>PASSWORD</label><input type="password" id="pw" value="${esc(pwv)}" oninput="pwv=this.value" onkeydown="if(event.key==='Enter')login()" autofocus>${err?`<p style="color:#ff8d96;text-align:center">${esc(err)}</p>`:''}<button class="cta" onclick="login()">Enter</button></div>`;return}
-  const tabs=['results','contestants','voters','settings'];
-  a.innerHTML=`<div class="flex" style="margin:0 0 14px">${tabs.map(t=>`<button class="${tab===t?'on':''}" onclick="tab='${t}';render()">${t}</button>`).join('')}<button onclick="logout()">Log out</button></div><div id="tb"></div>`;
-  $('#tb').innerHTML=({results:tResults,contestants:tCont,voters:tVoters,settings:tSet})[tab]();
+  if(!tok){a.innerHTML=`<div class="panel"><h2 style="margin-top:0">${SUPER?'Super Admin':'Admin'} Login<span>Staff only</span></h2><label>PASSWORD</label><input type="password" value="${esc(pwv)}" oninput="pwv=this.value" onkeydown="if(event.key==='Enter')login()" autofocus>${err?`<p style="color:#ff8d96;text-align:center">${esc(err)}</p>`:''}<button class="cta" onclick="login()">Enter</button></div>`;return}
+  a.innerHTML=`<div class="flex" style="margin:0 0 14px">${tabsList().map(t=>`<button class="${tab===t?'on':''}" onclick="go('${t}')">${t}</button>`).join('')}<button onclick="logout()">Log out</button></div><div id="tb" class="${anim?'tabin':''}"></div>`;
+  $('#tb').innerHTML=({overview:tOverview,results:tResults,contestants:tCont,voters:tVoters,audit:tAudit,site:tSite,activity:tLog,settings:tSet})[tab]();
+  if(anim){document.querySelectorAll('#tb .row,#tb .stat,#tb tr').forEach((e,i)=>e.style.animationDelay=Math.min(i,24)*45+'ms');countUp();anim=false}
 }
+function countUp(){document.querySelectorAll('.num[data-n]').forEach(e=>{const t=+e.dataset.n;let s=null;const f=ts=>{s??=ts;const p=Math.min((ts-s)/1200,1);e.textContent=Math.round(t*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f)})}
+
+/* ---- results ---- */
+function ranked(g){const t=tally()[g];return D.contestants.filter(c=>c.gender===g).map(c=>({...c,n:t[c.id]||0})).sort((a,b)=>b.n-a.n)}
 function resBlock(g,title){
-  const t=tally()[g],list=D.contestants.filter(c=>c.gender===g).map(c=>({...c,n:t[c.id]||0})).sort((a,b)=>b.n-a.n),top=list[0]?.n||0,tot=list.reduce((s,c)=>s+c.n,0);
-  return `<div class="panel wide"><h2 style="margin-top:0">${title}<span>${tot} votes</span></h2>`+(list.map((c,i)=>`<div class="row"><div class="rk">${['🥇','🥈','🥉'][i]||i+1}</div><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b>${top>0&&c.n===top?`<span class="chip">${g==='M'?'LEADING MR':'LEADING MISS'}</span>`:''}<div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="font-size:1.3rem;color:var(--gold2)">${c.n}</div></div>`).join('')||'<p class="mut">No contestants yet.</p>')+'</div>';
+  const list=ranked(g),top=list[0]?.n||0,tot=list.reduce((s,c)=>s+c.n,0);
+  return `<div class="panel wide"><h2 style="margin-top:0">${title}<span>${tot} votes</span></h2>`+(list.map((c,i)=>`<div class="row"><div class="rk">${medal(i)}</div><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b>${top>0&&c.n===top?`<span class="chip">${g==='M'?'LEADING MR':'LEADING MISS'}</span>`:''}<div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="font-size:1.3rem;color:var(--gold2)">${c.n}</div></div>`).join('')||'<p class="mut">No contestants yet.</p>')+'</div>';
 }
-function tResults(){return `<p class="mut">Live results (auto-refreshing) · ${D.votes.length} total voters</p>`+resBlock('M','MR. FRESHER')+resBlock('F','MISS FRESHER')+`<div class="flex"><button onclick="dlResults()">⬇ Download results</button><button onclick="dlVoters()">⬇ Download voter list</button></div>`}
+function tResults(){return `<p class="mut">Live results (auto-refreshing) · ${D.votes.length} total voters</p>`+resBlock('M','MR. FRESHER')+resBlock('F','MISS FRESHER')+`<div class="flex"><button onclick="dlResults()">⬇ Download results</button><button onclick="dlVoters()">⬇ Download voter list</button><button onclick="setS({winners:!${D.winners}})">${D.winners?'Hide winners screen':'👑 Publish winners screen'}</button></div>`}
+
+/* ---- super: overview ---- */
+function flagFn(){const ph={};D.votes.forEach(v=>(ph[v.phone]=ph[v.phone]||[]).push(v));const ids=new Set(D.contestants.map(c=>c.id));return v=>{const f=[];if((ph[v.phone]||[]).length>1)f.push('Shared phone');if(!ids.has(v.m)||!ids.has(v.f))f.push('Removed contestant');return f}}
+function timeline(){
+  if(!D.votes.length)return '<p class="mut">No votes yet.</p>';
+  const H=3600e3,ts=D.votes.map(v=>Math.floor(v.t/H)),max=Math.max(...ts),min=Math.max(Math.min(...ts),max-47),n=max-min+1,b=Array(n).fill(0);
+  ts.forEach(t=>{if(t>=min)b[t-min]++});const mx=Math.max(...b),w=600/n;
+  return `<svg viewBox="0 0 600 130" style="width:100%"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6e27a"/><stop offset="1" stop-color="#c1121f"/></linearGradient></defs>${b.map((v,i)=>`<rect x="${i*w+1}" y="${120-v/mx*110}" width="${Math.max(w-2,1)}" height="${v/mx*110}" fill="url(#g)" rx="2"><title>${new Date((min+i)*H).toLocaleString()}: ${v}</title></rect>`).join('')}</svg><p class="mut" style="font-size:.8rem">Votes per hour</p>`;
+}
+function tOverview(){
+  const fl=flagFn(),nf=D.votes.filter(v=>fl(v).length).length,m=ranked('M')[0],f=ranked('F')[0];
+  const st=(l,v)=>`<div class="stat"><div class="v">${v}</div><small>${l}</small></div>`;
+  return `<div class="stats"><div class="stat"><div class="num" data-n="${D.votes.length}">0</div><small>TOTAL VOTES</small></div>${st('MR LEADER',m&&m.n?esc(m.name)+' · '+m.n:'—')}${st('MISS LEADER',f&&f.n?esc(f.name)+' · '+f.n:'—')}<div class="stat"><div class="num" data-n="${nf}">0</div><small>FLAGGED VOTES</small></div>${st('POLL',D.open?'OPEN':'CLOSED')}${st('WINNERS SCREEN',D.winners?'LIVE':'HIDDEN')}</div><div class="panel wide">${timeline()}</div>`;
+}
+/* ---- super: audit ---- */
+function auditRows(){
+  const fl=flagFn(),q=A.q.trim().toLowerCase();
+  const rows=[...D.votes].sort((a,b)=>b.t-a.t).map(v=>({v,f:fl(v)})).filter(({v,f})=>(!A.flagged||f.length)&&(!q||[v.reg,v.name,v.phone].join(' ').toLowerCase().includes(q)));
+  return rows.map(({v,f})=>`<tr><td>${new Date(v.t).toLocaleString()}</td><td>${esc(v.reg)}</td><td>${esc(v.name)}</td><td>${esc(v.phone)}</td><td>${esc(nm(v.m))}</td><td>${esc(nm(v.f))}</td><td>${f.map(x=>`<span class="flag">${x}</span>`).join('')||'—'}</td><td>${dbtn('dv'+v.id,'Remove',`delV('${esc(v.id)}')`)}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">No matching votes</td></tr>';
+}
+function tAudit(){
+  return `<div class="panel wide"><h2 style="margin-top:0">Vote Review<span>Read-only audit · removals are logged in Activity</span></h2>
+  <div class="flex" style="margin-top:0"><input style="max-width:280px" placeholder="Search reg / name / phone" value="${esc(A.q)}" oninput="A.q=this.value;$('#atb').innerHTML=auditRows()"><label style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" style="width:auto" ${A.flagged?'checked':''} onchange="A.flagged=this.checked;$('#atb').innerHTML=auditRows()">FLAGGED ONLY</label><button onclick="dlVoters()">⬇ Download</button></div>
+  <div class="tbl"><table><tr><th>Time</th><th>Reg No</th><th>Name</th><th>Phone</th><th>Mr pick</th><th>Miss pick</th><th>Flags</th><th></th></tr><tbody id="atb">${auditRows()}</tbody></table></div></div>`;
+}
+/* ---- super: site + activity ---- */
+function tSite(){
+  ST=ST||{presenter:D.site.presenter||'',title:D.site.title||'',tagline:D.site.tagline||''};
+  return `<div class="panel wide"><h2 style="margin-top:0">Site Settings<span>Text shown on the public page</span></h2>
+  <label>PRESENTED BY</label><input value="${esc(ST.presenter)}" oninput="ST.presenter=this.value">
+  <label>EVENT TITLE</label><input value="${esc(ST.title)}" oninput="ST.title=this.value">
+  <label>TAGLINE</label><input value="${esc(ST.tagline)}" oninput="ST.tagline=this.value">
+  <div class="flex"><button onclick="saveSite()">Save site text</button><a class="btn" href="/" target="_blank">Open public site</a></div></div>`;
+}
+function tLog(){
+  return `<div class="panel wide"><h2 style="margin-top:0">Activity Log<span>Latest 150 admin actions</span></h2><div class="tbl"><table><tr><th>Time</th><th>Who</th><th>Action</th><th>Details</th></tr>`+(D.log||[]).map(l=>`<tr><td>${new Date(l.t).toLocaleString()}</td><td>${esc(l.role)}</td><td>${esc(l.action)}</td><td>${esc(l.detail)}</td></tr>`).join('')+'</table></div></div>';
+}
+/* ---- contestants ---- */
 function tCont(){
   const rows=D.contestants.map(c=>`<div class="row"><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b><span class="chip">${c.gender==='M'?'MR':'MISS'}</span><br><em class="mut">${esc(c.talent)}</em></div><button onclick="editC('${esc(c.id)}')">Edit</button>${dbtn('dc'+c.id,'Delete',`delC('${esc(c.id)}')`)}</div>`).join('');
   const pv=X.image?`style="background-image:url('${X.image}')"`:imgStyle(X);
@@ -62,11 +114,12 @@ function tVoters(){
 }
 function tSet(){
   return `<div class="panel wide" style="text-align:center"><h2 style="margin-top:0">Poll Controls</h2>
-  <p class="mut">Voting is <b style="color:var(--gold2)">${D.open?'OPEN':'CLOSED'}</b> · Public leaderboard is <b style="color:var(--gold2)">${D.showBoard?'VISIBLE':'HIDDEN'}</b></p>
-  <div class="flex"><button onclick="toggle()">${D.open?'Close voting':'Open voting'}</button><button onclick="toggleBoard()">${D.showBoard?'Hide':'Show'} public leaderboard</button>
-  ${dbtn('rv','Reset all votes (progress)',"reset(false)")}${dbtn('ra','Reset everything',"reset(true)")}</div>
-  <p class="mut" style="font-size:.85rem;margin-top:18px">Resetting votes frees every registration number to vote again. Resetting everything also removes all contestants and photos.</p></div>`;
+  <p class="mut">Voting is <b style="color:var(--gold2)">${D.open?'OPEN':'CLOSED'}</b> · Leaderboard <b style="color:var(--gold2)">${D.showBoard?'VISIBLE':'HIDDEN'}</b> · Winners screen <b style="color:var(--gold2)">${D.winners?'LIVE':'HIDDEN'}</b></p>
+  <div class="flex"><button onclick="setS({open:${!D.open}})">${D.open?'Close voting':'Open voting'}</button><button onclick="setS({showBoard:${!D.showBoard}})">${D.showBoard?'Hide':'Show'} public leaderboard</button><button onclick="setS({winners:${!D.winners}})">${D.winners?'Hide winners screen':'👑 Publish winners screen'}</button></div>
+  <div class="flex">${dbtn('rv','Reset all votes (progress)',"reset(false)")}${dbtn('ra','Reset everything',"reset(true)")}</div>
+  <p class="mut" style="font-size:.85rem;margin-top:18px">Publishing the winners screen shows the winners reveal and final leaderboard to everyone and stops voting. Resets free every registration number to vote again; "everything" also removes contestants.</p></div>`;
 }
+/* ---- actions ---- */
 function editC(id){const c=D.contestants.find(x=>x.id===id);X={id,name:c.name,gender:c.gender,talent:c.talent||'',image:'',img:c.img};render();scrollTo(0,0)}
 function clearX(){X={id:null,name:'',gender:'M',talent:'',image:'',img:0};render()}
 function pickImg(f){
@@ -74,20 +127,16 @@ function pickImg(f){
   im.onload=()=>{const s=Math.min(1,800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);X.image=c.toDataURL('image/jpeg',.85);URL.revokeObjectURL(u);render()};
   im.onerror=()=>toast('Could not read that image');im.src=u;
 }
-async function saveC(){
-  if(!X.name.trim())return toast('Enter a name');
-  try{await api('admin/contestant','POST',{id:X.id,name:X.name,gender:X.gender,talent:X.talent,image:X.image});toast('Saved');clearX();await refresh()}catch(e){toast(e.message)}
-}
-async function delC(id){try{await api('admin/contestant/'+id,'DELETE');await refresh()}catch(e){toast(e.message)}}
-async function delV(id){try{await api('admin/vote/'+id,'DELETE');await refresh()}catch(e){toast(e.message)}}
-async function toggle(){try{await api('admin/settings','POST',{open:!D.open,showBoard:D.showBoard});await refresh()}catch(e){toast(e.message)}}
-async function toggleBoard(){try{await api('admin/settings','POST',{open:D.open,showBoard:!D.showBoard});await refresh()}catch(e){toast(e.message)}}
-async function reset(all){try{await api('admin/reset','POST',{all});toast('Reset complete');await refresh()}catch(e){toast(e.message)}}
+const run=async(fn,ok)=>{try{await fn();if(ok)toast(ok);await refresh(true)}catch(e){toast(e.message)}};
+function saveC(){if(!X.name.trim())return toast('Enter a name');run(async()=>{await api('admin/contestant','POST',{id:X.id,name:X.name,gender:X.gender,talent:X.talent,image:X.image});X={id:null,name:'',gender:'M',talent:'',image:'',img:0}},'Saved')}
+const delC=id=>run(()=>api('admin/contestant/'+id,'DELETE'));
+const delV=id=>run(()=>api('admin/vote/'+id,'DELETE'),'Vote removed (logged)');
+const setS=o=>run(()=>api('admin/settings','POST',o),'Updated');
+const saveSite=()=>run(async()=>{await api('admin/settings','POST',ST);ST=null},'Site text saved');
+const reset=all=>run(()=>api('admin/reset','POST',{all}),'Reset complete');
 const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
 function save(name,rows){const b=new Blob(['\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-function dlResults(){const t=tally(),r=[['Category','Contestant','Talent','Votes']];
-  ['M','F'].forEach(g=>D.contestants.filter(c=>c.gender===g).map(c=>[g==='M'?'Mr Fresher':'Miss Fresher',c.name,c.talent,t[g][c.id]||0]).sort((a,b)=>b[3]-a[3]).forEach(x=>r.push(x)));
-  save('aagaaz2k26-results.csv',r)}
+function dlResults(){const r=[['Category','Rank','Contestant','Talent','Votes']];['M','F'].forEach(g=>ranked(g).forEach((c,i)=>r.push([g==='M'?'Mr Fresher':'Miss Fresher',i+1,c.name,c.talent,c.n])));save('aagaaz2k26-results.csv',r)}
 function dlVoters(){save('aagaaz2k26-voters.csv',[['Reg No','Name','Phone','Mr Fresher pick','Miss Fresher pick','Time'],...D.votes.map(v=>[v.reg,v.name,v.phone,nm(v.m),nm(v.f),new Date(v.t).toLocaleString()])])}
-render();if(tok){refresh().then(()=>{timer=setInterval(()=>{if(!X.image)refresh()},10000)})}
+render();if(tok){refresh(true).then(startTimer)}
 </script></body></html>
