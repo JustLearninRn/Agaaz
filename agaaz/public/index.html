@@ -14,8 +14,8 @@
 </main>
 <script src="/common.js"></script>
 <script>
-let board=null,C=[],open=true,sel={m:null,f:null},F={reg:'',name:'',phone:''},done=false,busy=false,loaded=false;
-async function load(){try{const r=await (await fetch('/api/public')).json();C=r.contestants;open=r.open;board=r.board||null;loaded=true}catch(e){toast('Could not load. Check your connection.')}render()}
+let W=null,board=null,C=[],open=true,sel={m:null,f:null},F={reg:'',name:'',phone:''},done=false,busy=false,loaded=false;
+async function load(){try{const r=await (await fetch('/api/public')).json();C=r.contestants;open=r.open;board=r.board||null;W=r.winners||null;applySite(r.site);loaded=true}catch(e){toast('Could not load. Check your connection.')}render()}
 function section(g,title,sub){
   const list=C.filter(c=>c.gender===g),k=g.toLowerCase();
   return `<h2>${title}<span>${sub}</span></h2><div class="grid">`+(list.map((c,i)=>`<div class="card ${sel[k]===c.id?'sel':''}" style="--i:${i}" onclick="pick('${k}','${esc(c.id)}')"><div class="ph" ${imgStyle(c)}>${c.img?'':esc((c.name||'?')[0])}</div><div class="in"><h3>${esc(c.name)}</h3><em>${esc(c.talent)}</em></div></div>`).join('')||'<p class="mut" style="grid-column:1/-1">Contestants arriving soon…</p>')+'</div>';
@@ -23,6 +23,7 @@ function section(g,title,sub){
 function pick(k,id){sel[k]=sel[k]===id?null:id;render()}
 function render(){
   const a=$('#app');if(!loaded){return}
+  if(W){renderWinners();return}
   if(done){a.innerHTML=`<div class="thanks"><div class="flash"></div><h2>✦ Vote Recorded ✦</h2><p class="mut">Thank you for walking the red carpet with us at AAGAAZ 2k26.<br>Each registration number can vote only once.</p></div>`;return}
   if(!open){a.innerHTML='<div class="thanks"><h2>Voting Closed</h2><p class="mut">The doors to the gala are shut. Stay tuned for the crowning!</p></div>';return}
   a.innerHTML=(board?'<div id="lb"></div>':'')+section('M','MR. FRESHER','Choose one gentleman')+section('F','MISS FRESHER','Choose one lady')+
@@ -45,7 +46,20 @@ async function submit(){
 }
 function lbCol(g,t){const l=C.filter(c=>c.gender===g).map(c=>({...c,n:board[c.id]||0})).sort((a,b)=>b.n-a.n).slice(0,5),top=l[0]?.n||0;
   return `<div class="panel wide" style="margin:0"><h2 style="margin-top:0;font-size:1.1rem">${t}<span>Live standings</span></h2>`+(l.map((c,i)=>`<div class="lbi"><div class="rk">${['🥇','🥈','🥉'][i]||i+1}</div><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b><div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="color:var(--gold2)">${c.n}</div></div>`).join('')||'<p class="mut">—</p>')+'</div>'}
+function applySite(s){if(!s)return;$('.intro b').textContent=s.presenter.toUpperCase();$('.hero small').textContent=s.presenter.toUpperCase()+' PRESENTS';$('.hero h1').textContent=s.title;$('.hero p').textContent=s.tagline;document.title=s.title+' · Mr & Miss Fresher'}
+let wT=[];
+function renderWinners(){$('#app').innerHTML='<div id="wn"></div><div id="wlb"></div><canvas id="cf"></canvas>';playW()}
+function playW(){wT.forEach(clearTimeout);wT=[];$('#wlb').innerHTML='';$('#wn').innerHTML='<div class="wintro"><p>And the crowns go to…</p></div>';
+  wT.push(setTimeout(()=>revealW('M'),3000),setTimeout(()=>revealW('F'),8500),setTimeout(showLBW,14000))}
+function revealW(g){const w=W[g].winners,box=document.createElement('div');box.className='wbox';
+  box.innerHTML=`<h2>${g==='M'?'MR. FRESHER':'MISS FRESHER'}<span>${w.length>1?'CO-WINNERS · TIE':'The crown goes to'}</span></h2><div class="wgrid">`+(w.map(c=>`<div class="wcard"><div class="ph" ${imgStyle(c)}>${c.img?'':esc((c.name||'?')[0])}</div><h3>${esc(c.name)}</h3><em>${esc(c.talent)}</em><b>${c.n} votes</b></div>`).join('')||'<p class="mut">No votes yet</p>')+'</div>';
+  $('.wintro')?.remove();$('#wn').appendChild(box);confetti()}
+function showLBW(){const col=(g,t)=>{const l=W[g].ranking,top=l[0]?.n||0;return `<div class="panel wide" style="margin:0;animation-delay:0s"><h2 style="margin-top:0;font-size:1.1rem">${t}<span>Final standings</span></h2>`+l.map((c,i)=>`<div class="lbi"><div class="rk">${['🥇','🥈','🥉'][i]||i+1}</div><div class="th" ${imgStyle(c)}></div><div class="gr"><b class="cz">${esc(c.name)}</b><div class="bar"><i style="width:${top?c.n/top*100:0}%"></i></div></div><div class="cz" style="color:var(--gold2)">${c.n}</div></div>`).join('')+'</div>'};
+  const e=$('#wlb');if(e)e.innerHTML='<h2>FINAL LEADERBOARD<span>AAGAAZ 2k26</span></h2><div class="lb">'+col('M','MR. FRESHER')+col('F','MISS FRESHER')+'</div><div class="flex"><button onclick="playW()">↻ Replay</button></div>'}
+function confetti(){const cv=$('#cf');if(!cv)return;const x=cv.getContext('2d');cv.width=innerWidth;cv.height=innerHeight;const cols=['#f6e27a','#d4af37','#c1121f','#fff6c4'];
+  const P=Array.from({length:140},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.6,w:4+Math.random()*6,h:8+Math.random()*8,v:2+Math.random()*3,r:Math.random()*6,s:(Math.random()-.5)*.2,c:cols[Math.random()*4|0]}));let n=0;
+  (function f(){x.clearRect(0,0,cv.width,cv.height);P.forEach(p=>{p.y+=p.v;p.r+=p.s;p.x+=Math.sin(p.r);x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()});if(++n<360)requestAnimationFrame(f);else x.clearRect(0,0,cv.width,cv.height)})()}
 function drawLB(){const e=$('#lb');if(e&&board)e.innerHTML='<h2>LEADERBOARD<span>Who is leading the gala</span></h2><div class="lb">'+lbCol('M','MR. FRESHER')+lbCol('F','MISS FRESHER')+'</div>'}
 load();
-setInterval(async()=>{try{const r=await(await fetch('/api/public')).json();board=r.board||null;if(!done&&open===r.open){if(!!board!==!!$('#lb'))render();else drawLB()}}catch(e){}},20000);
+setInterval(async()=>{try{const r=await(await fetch('/api/public')).json();const hadW=!!W;board=r.board||null;W=r.winners||null;C=r.contestants;applySite(r.site);const o=open;open=r.open;if(!!W!==hadW||(!W&&!done&&o!==open))render();else if(!W&&!done){if(!!board!==!!$('#lb'))render();else drawLB()}}catch(e){}},20000);
 </script></body></html>
