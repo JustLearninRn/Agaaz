@@ -33,6 +33,13 @@ async function all(s, prefix) {
   }
   return out;
 }
+let cache = { t: 0, v: null };
+async function counts(s) {
+  if (cache.v && Date.now() - cache.t < 15000) return cache.v;
+  const vs = await all(s, "vote:"); const c = {};
+  vs.forEach((v) => { c[v.m] = (c[v.m] || 0) + 1; c[v.f] = (c[v.f] || 0) + 1; });
+  cache = { t: Date.now(), v: c }; return c;
+}
 const body = async (req) => { try { return await req.json(); } catch { return {}; } };
 
 export default async (req) => {
@@ -44,7 +51,7 @@ export default async (req) => {
     if (path === "public" && m === "GET") {
       const [cs, st] = await Promise.all([all(s, "contestant:"), s.get("settings", { type: "json" })]);
       const contestants = cs.map(({ _key, ...c }) => c).sort((a, b) => (a.order || 0) - (b.order || 0));
-      return J({ contestants, open: st ? st.open !== false : true });
+      return J({ contestants, open: st ? st.open !== false : true, board: st && st.showBoard ? await counts(s) : null });
     }
     if (path.startsWith("img/") && m === "GET") {
       const r = await s.getWithMetadata("img:" + clean(path.slice(4)), { type: "arrayBuffer" });
@@ -78,7 +85,7 @@ export default async (req) => {
 
       if (path === "admin/data" && m === "GET") {
         const [cs, vs, st] = await Promise.all([all(s, "contestant:"), all(s, "vote:"), s.get("settings", { type: "json" })]);
-        return J({ contestants: cs.map(({ _key, ...c }) => c), votes: vs.map(({ _key, ...v }) => ({ ...v, id: _key.slice(5) })), open: st ? st.open !== false : true });
+        return J({ contestants: cs.map(({ _key, ...c }) => c), votes: vs.map(({ _key, ...v }) => ({ ...v, id: _key.slice(5) })), open: st ? st.open !== false : true, showBoard: !!(st && st.showBoard) });
       }
       if (path === "admin/contestant" && m === "POST") {
         const b = await body(req);
@@ -109,7 +116,7 @@ export default async (req) => {
       }
       if (path === "admin/settings" && m === "POST") {
         const b = await body(req);
-        await s.set("settings", JSON.stringify({ open: !!b.open }));
+        await s.set("settings", JSON.stringify({ open: !!b.open, showBoard: !!b.showBoard }));
         return J({ ok: true });
       }
       if (path === "admin/reset" && m === "POST") {
