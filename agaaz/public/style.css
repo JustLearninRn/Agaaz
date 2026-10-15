@@ -1,0 +1,50 @@
+:root{--bg:#0a0507;--card:#170b10;--red:#8b0a1e;--red2:#c1121f;--gold:#d4af37;--gold2:#f6e27a;--ink:#f5ead2;--mut:#b9a98a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#3a0612 0,var(--bg) 60%) fixed;color:var(--ink);font-family:'Playfair Display',Georgia,serif;min-height:100vh;overflow-x:hidden}
+h1,h2,h3,.cz,button,label{font-family:'Cinzel',Georgia,serif}
+canvas#sp{position:fixed;inset:0;pointer-events:none;z-index:0}
+.cur{position:fixed;top:0;bottom:0;width:51%;background:repeating-linear-gradient(90deg,#5c0615 0 18px,#7d0a1e 18px 36px);z-index:99;box-shadow:0 0 60px #000;pointer-events:none;animation:open 1.8s .5s cubic-bezier(.7,0,.2,1) forwards}
+.cur.l{left:0;--d:-101%}.cur.r{right:0;--d:101%}
+@keyframes open{to{transform:translateX(var(--d))}}
+.beam{position:fixed;top:-20vh;width:30vw;height:140vh;background:linear-gradient(180deg,rgba(246,226,122,.18),transparent 70%);filter:blur(10px);transform-origin:top;z-index:0;pointer-events:none;animation:sway 7s ease-in-out infinite alternate}
+.beam.a{left:5vw;--r:-14deg}.beam.b{right:5vw;--r:14deg;animation-delay:-3s}
+@keyframes sway{from{transform:rotate(calc(var(--r) - 8deg))}to{transform:rotate(calc(var(--r) + 8deg))}}
+main{position:relative;z-index:2;max-width:1000px;margin:0 auto;padding:18px 16px 70px}
+button,.btn{cursor:pointer;border:1px solid var(--gold);background:transparent;color:var(--gold2);padding:9px 16px;letter-spacing:.12em;font-size:.8rem;text-transform:uppercase;transition:.25s;text-decoration:none;display:inline-block}
+button:hover,.btn:hover{background:var(--gold);color:#190a0e;box-shadow:0 0 20px rgba(212,175,55,.5)}
+button.on{background:var(--gold);color:#190a0e}button.red{border-color:var(--red2);color:#ff8d96}button.red:hover{background:var(--red2);color:#fff}
+button:disabled{opacity:.4;cursor:not-allowed}
+.hero{text-align:center;padding:30px 0 20px}
+.hero small{letter-spacing:.5em;color:var(--mut);font-family:'Cinzel';font-size:.75rem;animation:fd 1.2s 2s both}
+.hero h1{margin:8px 0;font-size:clamp(2.6rem,10vw,5.5rem);letter-spacing:.08em;background:linear-gradient(100deg,#8a6d12,var(--gold2),#fff6c4,var(--gold2),#8a6d12);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 5s linear infinite,rise 1.4s 1.6s both}
+.hero p{font-style:italic;color:var(--mut);margin:0;animation:fd 1.2s 2.4s both}
+@keyframes shine{to{background-position:-250% 0}}@keyframes rise{from{opacity:0;transform:translateY(40px) scale(.9);letter-spacing:.4em}}@keyframes fd{from{opacity:0}}
+.rope{height:3px;margin:22px auto;width:min(420px,70%);background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:fd 2s 2.6s both}
+h2{text-align:center;font-size:1.5rem;color:var(--gold2);letter-spacing:.2em;margin:34px 0 4px}
+h2 span{display:block;font-size:.7rem;color:var(--mut);letter-spacing:.3em;font-family:'Playfair Display';font-style:italic;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;margin-top:16px}
+.card{background:linear-gradient(160deg,#241018,var(--card));border:1px solid #4a3a1a;position:relative;overflow:hidden;cursor:pointer;transition:.35s;animation:up .8s both;animation-delay:calc(var(--i,0)*90ms + 2.2s)}
+.card:hover{transform:translateY(-6px);border-color:var(--gold);box-shadow:0 12px 34px rgba(193,18,31,.35)}
+.card.sel{border-color:var(--gold2);box-shadow:0 0 0 2px var(--gold),0 0 36px rgba(246,226,122,.45)}
+.card.sel::after{content:"✦ YOUR PICK";position:absolute;top:10px;right:0;background:var(--gold);color:#190a0e;font-family:'Cinzel';font-size:.65rem;padding:4px 10px;letter-spacing:.15em}
+.ph{aspect-ratio:4/5;background:#120609 center/cover;display:flex;align-items:center;justify-content:center;font-family:'Cinzel';font-size:4rem;color:#5c4a1c}
+.card .in{padding:12px 14px 16px;text-align:center}.card h3{margin:0 0 4px;font-size:1rem;color:var(--gold2)}.card em{color:var(--mut);font-size:.85rem}
+@keyframes up{from{opacity:0;transform:translateY(34px)}}
+.panel{background:rgba(23,11,16,.85);border:1px solid #4a3a1a;padding:22px;margin:20px auto;max-width:560px;backdrop-filter:blur(6px);animation:up .8s 2.4s both}
+.panel.wide{max-width:none;animation-delay:0s}
+label{display:block;font-size:.72rem;letter-spacing:.18em;color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;padding:11px;background:#0d0508;border:1px solid #5a461a;color:var(--ink);font:inherit;font-size:1rem}
+input:focus,select:focus{outline:none;border-color:var(--gold2);box-shadow:0 0 12px rgba(212,175,55,.4)}
+.cta{display:block;margin:26px auto 0;padding:14px 38px;font-size:1rem;background:linear-gradient(90deg,var(--red),var(--red2));border-color:var(--gold);color:#fff}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--gold);color:#190a0e;padding:12px 22px;font-family:'Cinzel';z-index:120;animation:up .4s both;max-width:90vw;text-align:center}
+.thanks{text-align:center;padding:50px 10px;animation:up 1s both}.thanks h2{font-size:2rem}
+.flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:110;animation:fl .7s 3}
+@keyframes fl{0%{opacity:.8}100%{opacity:0}}
+.bar{height:10px;background:#2a1a1e;margin-top:6px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--red2),var(--gold2));transition:width 1s}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #2f2012}
+.row .th{width:44px;height:54px;background:#120609 center/cover;flex:none}.row .gr{flex:1;min-width:0}
+.tbl{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:8px;border-bottom:1px solid #2f2012;text-align:left;white-space:nowrap}
+.chip{display:inline-block;background:var(--gold);color:#190a0e;font-family:'Cinzel';font-size:.65rem;padding:2px 8px;letter-spacing:.12em;margin-left:6px}
+.flex{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.mut{color:var(--mut);text-align:center}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;animation-delay:0s!important}}

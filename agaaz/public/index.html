@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>AGAAZ 2k26 · Mr &amp; Miss Fresher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0507">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<canvas id="sp"></canvas><div class="beam a"></div><div class="beam b"></div><div class="cur l" id="cl"></div><div class="cur r" id="cr"></div>
+<main>
+<div class="hero"><small>THE MET GALA · FRESHER'S NIGHT</small><h1>AGAAZ 2k26</h1><p>Crown your Mr. &amp; Miss Fresher on the red carpet</p></div>
+<div class="rope"></div><div id="app"><p class="mut">Loading the red carpet…</p></div>
+</main>
+<script src="/common.js"></script>
+<script>
+let C=[],open=true,sel={m:null,f:null},F={reg:'',name:'',phone:''},done=false,busy=false,loaded=false;
+async function load(){try{const r=await (await fetch('/api/public')).json();C=r.contestants;open=r.open;loaded=true}catch(e){toast('Could not load. Check your connection.')}render()}
+function section(g,title,sub){
+  const list=C.filter(c=>c.gender===g),k=g.toLowerCase();
+  return `<h2>${title}<span>${sub}</span></h2><div class="grid">`+(list.map((c,i)=>`<div class="card ${sel[k]===c.id?'sel':''}" style="--i:${i}" onclick="pick('${k}','${esc(c.id)}')"><div class="ph" ${imgStyle(c)}>${c.img?'':esc((c.name||'?')[0])}</div><div class="in"><h3>${esc(c.name)}</h3><em>${esc(c.talent)}</em></div></div>`).join('')||'<p class="mut" style="grid-column:1/-1">Contestants arriving soon…</p>')+'</div>';
+}
+function pick(k,id){sel[k]=sel[k]===id?null:id;render()}
+function render(){
+  const a=$('#app');if(!loaded){return}
+  if(done){a.innerHTML=`<div class="thanks"><div class="flash"></div><h2>✦ Vote Recorded ✦</h2><p class="mut">Thank you for walking the red carpet with us at AGAAZ 2k26.<br>Each registration number can vote only once.</p></div>`;return}
+  if(!open){a.innerHTML='<div class="thanks"><h2>Voting Closed</h2><p class="mut">The doors to the gala are shut. Stay tuned for the crowning!</p></div>';return}
+  a.innerHTML=section('M','MR. FRESHER','Choose one gentleman')+section('F','MISS FRESHER','Choose one lady')+
+  `<div class="panel"><h2 style="margin-top:0">Your Details<span>Required to cast your vote</span></h2>
+  <label>REGISTRATION NUMBER</label><input value="${esc(F.reg)}" oninput="F.reg=this.value" autocomplete="off">
+  <label>FULL NAME</label><input value="${esc(F.name)}" oninput="F.name=this.value" autocomplete="name">
+  <label>PHONE NUMBER</label><input type="tel" inputmode="numeric" maxlength="10" value="${esc(F.phone)}" oninput="F.phone=this.value" autocomplete="tel">
+  <button class="cta" ${busy?'disabled':''} onclick="submit()">${busy?'Submitting…':'Cast My Vote'}</button></div>`;
+}
+async function submit(){
+  if(!F.reg.trim()||!F.name.trim())return toast('Please enter your registration number and name');
+  if(!/^\d{10}$/.test(F.phone.trim()))return toast('Enter a valid 10-digit phone number');
+  if(!sel.m||!sel.f)return toast('Pick one Mr. Fresher and one Miss Fresher');
+  busy=true;render();
+  try{
+    const r=await fetch('/api/vote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...F,m:sel.m,f:sel.f})});
+    const j=await r.json();busy=false;
+    if(r.ok){done=true;render()}else{render();toast(j.error||'Could not submit')}
+  }catch(e){busy=false;render();toast('Network error. Please try again.')}
+}
+load();
+</script></body></html>
